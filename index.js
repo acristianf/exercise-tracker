@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const { MongoClient, ObjectId } = require("mongodb");
+const cors = require("cors");
 
 const client = new MongoClient(process.env.MONGO_URI);
 async function start() {
@@ -20,9 +21,10 @@ const exercises = db.collection("exercises");
 const port = process.env.PORT || 3000;
 const app = express();
 
+app.use(cors());
 app.use(express.static("public"));
 app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: true }));
 
 app.get("/", (_, res) => {
 	res.sendFile(process.cwd() + "/views/index.html");
@@ -67,53 +69,63 @@ app.get("/api/users/:_id/logs?", async (req, res) => {
 });
 
 app.post("/api/users", async (req, res) => {
-	const username = req.body["username"];
-	const result = await users.findOne({ username: username });
-	if (!result) {
-		const inserted = await users.insertOne({
-			username: username
-		});
-		res.json({
-			username: username,
-			_id: inserted["insertedId"]
-		});
-	} else {
-		res.json(result);
-	};
+	try {
+		const username = req.body["username"];
+		const result = await users.findOne({ username: username });
+		if (!result) {
+			const inserted = await users.insertOne({
+				username: username
+			});
+			res.json({
+				username: username,
+				_id: inserted["insertedId"]
+			});
+		} else {
+			res.json(result);
+		};
+	} catch (e) {
+		console.log("Error: " + e);
+		process.exit(1);
+	}
 });
 
-app.post("/api/users/:id/exercises", async (req, res) => {
-	const id = req.params.id;
-	const result = await users.findOne({ _id: new ObjectId(id) }, { username: 1 });
-	if (result) {
-		let description = req.body["description"];
-		let duration = req.body["duration"];
-		let date = req.body["date"] ? new Date(req.body["date"]) : new Date();
-		if (isNaN(date)) {
-			res.status(400).json({ error: "Invalid Date" });
-		};
-		if (isNaN(duration)) {
-			res.status(400).json({ error: "Invalid Duration" });
-		};
-		const inserted = await exercises.insertOne({
-			username: result["username"],
-			description: description,
-			duration: duration,
-			date: date
-		});
-		res.json({
-			username: result["username"],
-			description: description,
-			duration: duration,
-			date: date.toDateString(),
-			_id: inserted["insertedId"]
-		});
-	} else {
-		res
-			.status(400)
-			.json({
-				error: `user not found with id ${id}`
-			})
+app.post("/api/users/:_id/exercises", async (req, res) => {
+	try {
+		const id = new ObjectId(req.params.id);
+		const result = await users.findOne({ _id: id }, { username: 1 });
+		if (result) {
+			let description = req.body["description"];
+			let duration = req.body["duration"];
+			let date = req.body["date"] ? new Date(req.body["date"]) : new Date();
+			if (isNaN(date)) {
+				res.status(400).json({ error: "Invalid Date" });
+			};
+			if (isNaN(duration)) {
+				res.status(400).json({ error: "Invalid Duration" });
+			};
+			const inserted = await exercises.insertOne({
+				username: result["username"],
+				description: description,
+				duration: duration,
+				date: date
+			});
+			res.json({
+				username: result["username"],
+				description: description,
+				duration: duration,
+				date: date.toDateString(),
+				_id: inserted["insertedId"]
+			});
+		} else {
+			res
+				.status(400)
+				.json({
+					error: `user not found with id ${id}`
+				})
+		}
+	} catch (e) {
+		console.log("Error: " + e);
+		process.exit(1);
 	}
 });
 
