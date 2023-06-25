@@ -94,11 +94,12 @@ app.post("/api/users/:_id/exercises", async (req, res) => {
 		const id = new ObjectId(req.params._id);
 		const result = await users.findOne({ _id: id });
 		if (result) {
-			let { description, duration } = req.body;
 			let date = req.body["date"] ? new Date(req.body["date"]) : new Date();
 			if (isNaN(date)) {
 				res.status(400).json({ error: "Invalid Date" });
 			};
+			let { description, duration } = req.body;
+			duration = new Number(duration);
 			if (isNaN(duration)) {
 				res.status(401).json({ error: "Invalid Duration" });
 			};
