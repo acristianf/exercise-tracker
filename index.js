@@ -47,9 +47,11 @@ app.get("/api/users/:_id/logs?", async (req, res) => {
 		const from = req.query.from ? new Date(req.query.from) : new Date(0);
 		const to = req.query.to ? new Date(req.query.to) : new Date();
 		const exercisesCursor = exercises
-			.aggregate([
-				{ $match: { date: { $gte: from, $lt: to } } },
-				{ $project: { _id: 0, username: 0 } }])
+			.find({
+				username: found["username"],
+				date: { $gte: from, $lt: to },
+			})
+			.project({ username: 0, _id: 0 })
 			.limit(limit);
 		const logs = await exercisesCursor.toArray();
 		logs.forEach(log => {
