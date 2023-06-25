@@ -99,6 +99,7 @@ app.post("/api/users/:_id/exercises", async (req, res) => {
 				res.status(400).json({ error: "Invalid Date" });
 			};
 			let { description, duration } = req.body;
+			description = description || "";
 			duration = new Number(duration);
 			if (isNaN(duration)) {
 				res.status(401).json({ error: "Invalid Duration" });
