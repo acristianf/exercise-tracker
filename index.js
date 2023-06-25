@@ -1,22 +1,33 @@
 require("dotenv").config();
 const express = require("express");
-const { MongoClient, ObjectId } = require("mongodb");
+const mongoose = require("mongoose");
 const cors = require("cors");
 
-const client = new MongoClient(process.env.MONGO_URI);
-async function start() {
-	try {
-		await client.connect();
-	} catch (e) {
-		console.log(`Error connecting to databade. ${e}`);
-		process.exit(1);
-	}
-}
-start();
+mongoose.connect(process.env.MONGO_URI);
 
-const db = client.db("exercise-tracke")
-const users = db.collection("users");
-const exercises = db.collection("exercises");
+const userSchema = new mongoose.Schema({
+	username: {
+		type: String,
+		required: true
+	}
+});
+const exerciseSchema = new mongoose.Schema({
+	user_id: { type: String, required: true },
+	description: {
+		type: String,
+		required: true
+	},
+	duration: {
+		type: Number,
+		required: true
+	},
+	date: {
+		type: Date,
+		required: true
+	}
+});
+const User = mongoose.model("User", userSchema);
+const Exercise = mongoose.model("Exercise", exerciseSchema);
 
 const port = process.env.PORT || 3000;
 const app = express();
@@ -31,91 +42,80 @@ app.get("/", (_, res) => {
 });
 
 app.get("/api/users", async (_, res) => {
-	const docs = await users.find().toArray();
+	const docs = await User.find();
 	res.send(docs);
 })
 
 app.get("/api/users/:_id/logs?", async (req, res) => {
-	const id = new ObjectId(req.params._id);
-	const found = await users.findOne({ _id: id });
-	if (!found) {
-		res
-			.status(400)
-			.json({
-				error: "User not found"
-			})
-	} else {
-		const limit = req.query.limit || 10;
-		const from = req.query.from ? new Date(req.query.from) : new Date(0);
-		const to = req.query.to ? new Date(req.query.to) : new Date();
-		const exercisesCursor = exercises
-			.find({
+	try {
+		const found = await User.findById(req.params._id);
+		if (!found) {
+			res
+				.status(400)
+				.json({
+					error: "User not found"
+				})
+		} else {
+			const limit = req.query.limit || 10;
+			const from = req.query.from ? new Date(req.query.from) : new Date(0);
+			const to = req.query.to ? new Date(req.query.to) : new Date();
+			const exercises = await Exercise.find({}, { user_id: 0, _id: 0, username: 0 }).gt("date", from).lt("date", to).limit(limit);
+			let logs = [];
+			exercises.forEach(e => {
+				logs.push({
+					description: e["description"],
+					duration: e["duration"],
+					date: e["date"].toDateString()
+				});
+			});
+			res.json({
 				username: found["username"],
-				date: { $gte: from, $lt: to },
+				count: exercises.length,
+				_id: found["_id"],
+				log: logs
 			})
-			.project({ username: 0, _id: 0 })
-			.limit(limit);
-		const logs = await exercisesCursor.toArray();
-		logs.forEach(log => {
-			log["date"] = log["date"].toDateString()
-		});
-		res.json({
-			username: found["username"],
-			count: logs.length,
-			_id: id,
-			logs: logs
-		})
+		}
+	} catch (e) {
+		console.log("Error: " + e);
+		res.send("There was an error getting the logs.");
 	}
 });
 
 app.post("/api/users", async (req, res) => {
 	try {
 		const username = req.body["username"];
-		const result = await users.findOne({ username: username });
+		const result = await User.findOne({ username: username }, { __v: 0 });
 		if (!result) {
-			const inserted = await users.insertOne({
-				username: username
-			});
-			res.json({
-				username: username,
-				_id: inserted["insertedId"]
-			});
+			const user = new User({ username: username });
+			const inserted = await user.save();
+			res.json(inserted);
 		} else {
 			res.json(result);
 		};
 	} catch (e) {
 		console.log("Error: " + e);
-		process.exit(1);
+		res.send("There was an error procesing /api/users");
 	}
 });
 
 app.post("/api/users/:_id/exercises", async (req, res) => {
 	try {
-		const id = new ObjectId(req.params._id);
-		const result = await users.findOne({ _id: id });
+		const result = await User.findById(req.params._id);
 		if (result) {
-			let date = req.body["date"] ? new Date(req.body["date"]) : new Date();
-			if (isNaN(date)) {
-				res.status(400).json({ error: "Invalid Date" });
-			};
-			let { description, duration } = req.body;
-			description = description || "";
-			duration = new Number(duration);
-			if (isNaN(duration)) {
-				res.status(401).json({ error: "Invalid Duration" });
-			};
-			const inserted = await exercises.insertOne({
-				username: result["username"],
+			let { description, duration, date } = req.body;
+			const exercise = new Exercise({
+				user_id: result["_id"],
 				description: description,
 				duration: duration,
-				date: date
+				date: date ? new Date(date) : new Date()
 			});
+			const saved = await exercise.save();
 			res.json({
+				_id: saved["user_id"],
 				username: result["username"],
-				description: description,
-				duration: duration,
-				date: date.toDateString(),
-				_id: inserted["insertedId"]
+				description: saved["description"],
+				duration: saved["duration"],
+				date: saved["date"].toDateString()
 			});
 		} else {
 			res
@@ -126,7 +126,7 @@ app.post("/api/users/:_id/exercises", async (req, res) => {
 		}
 	} catch (e) {
 		console.log("Error: " + e);
-		process.exit(1);
+		res.json("There was an error procesing /api/users/:_id/exercises");
 	}
 });
 
