@@ -91,11 +91,10 @@ app.post("/api/users", async (req, res) => {
 
 app.post("/api/users/:_id/exercises", async (req, res) => {
 	try {
-		const id = new ObjectId(req.params.id);
-		const result = await users.findOne({ _id: id }, { username: 1 });
+		const id = new ObjectId(req.params._id);
+		const result = await users.findOne({ _id: id });
 		if (result) {
-			let description = req.body["description"];
-			let duration = req.body["duration"];
+			let { description, duration } = req.body;
 			let date = req.body["date"] ? new Date(req.body["date"]) : new Date();
 			if (isNaN(date)) {
 				res.status(400).json({ error: "Invalid Date" });
