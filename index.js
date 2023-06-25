@@ -101,7 +101,7 @@ app.post("/api/users/:_id/exercises", async (req, res) => {
 				res.status(400).json({ error: "Invalid Date" });
 			};
 			if (isNaN(duration)) {
-				res.status(400).json({ error: "Invalid Duration" });
+				res.status(401).json({ error: "Invalid Duration" });
 			};
 			const inserted = await exercises.insertOne({
 				username: result["username"],
@@ -118,7 +118,7 @@ app.post("/api/users/:_id/exercises", async (req, res) => {
 			});
 		} else {
 			res
-				.status(400)
+				.status(402)
 				.json({
 					error: `user not found with id ${id}`
 				})
