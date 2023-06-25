@@ -46,7 +46,7 @@ app.get("/api/users", async (_, res) => {
 	res.send(docs);
 })
 
-app.get("/api/users/:_id/logs?", async (req, res) => {
+app.get("/api/users/:_id/logs", async (req, res) => {
 	try {
 		const found = await User.findById(req.params._id);
 		if (!found) {
@@ -60,14 +60,11 @@ app.get("/api/users/:_id/logs?", async (req, res) => {
 			const from = req.query.from ? new Date(req.query.from) : new Date(0);
 			const to = req.query.to ? new Date(req.query.to) : new Date();
 			const exercises = await Exercise.find({}, { user_id: 0, _id: 0, username: 0 }).gt("date", from).lt("date", to).limit(limit);
-			let logs = [];
-			exercises.forEach(e => {
-				logs.push({
-					description: e["description"],
-					duration: e["duration"],
-					date: e["date"].toDateString()
-				});
-			});
+			const logs = exercises.map(e => ({
+				description: e.description,
+				duration: e.duration,
+				date: e.date.toDateString()
+			}));
 			res.json({
 				username: found["username"],
 				count: exercises.length,
